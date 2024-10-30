@@ -1,15 +1,57 @@
-// eslint-disable-next-line no-unused-vars
-import React, { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
+import './ProductList.css';
 
 const ProductList = () => {
   const [productos, setProductos] = useState([]);
   const [categorias, setCategorias] = useState([]);
   const [productoSeleccionado, setProductoSeleccionado] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [modalCompraVisible, setModalCompraVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [selectedProducts, setSelectedProducts] = useState([]);
+  const [clienteId, setClienteId] = useState(''); // Nuevo estado para ID de cliente
+  const [tarjetaId, setTarjetaId] = useState(''); // Nuevo estado para ID de tarjeta
+  const [tarjetas, setTarjetas] = useState([]);
 
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
+
+  //inicio
+  useEffect(() => {
+    const storedClient = localStorage.getItem('user');
+
+    fetchProductos();
+    if (storedClient) {
+      const clientData = JSON.parse(storedClient);
+      setClienteId(clientData.id);
+      setTarjetas(clientData.tarjetas); // Establece las tarjetas del cliente
+      if (clientData.tarjetas.length > 0) {
+        setTarjetaId(clientData.tarjetas[0].id);
+      }
+    }
+    axios.get(`${backendUrl}/api/productos/listar-categorias`)
+      .then(response => setCategorias(response.data))
+      .catch(error => console.error('Error al obtener categorías:', error));
+  }, [backendUrl]);
+
+  const handleCheckboxChange = (productoId) => {
+    setSelectedProducts((prevSelected) => {
+      if (prevSelected.includes(productoId)) {
+        return prevSelected.filter((id) => id !== productoId);
+      } else {
+        return [...prevSelected, productoId];
+      }
+    });
+  };
+
+  // Modal de compra
+  const handleBuyClick = () => {
+    if (selectedProducts.length === 0) {
+      alert('Por favor, selecciona al menos un producto.');
+      return;
+    }
+    setModalCompraVisible(true); // Abre el modal de compra
+  };
 
   // Obtener productos al cargar la página
   const fetchProductos = () => {
@@ -17,17 +59,6 @@ const ProductList = () => {
       .then(response => setProductos(response.data))
       .catch(error => console.error('Error al obtener productos:', error));
   };
-
-  useEffect(() => {
-    fetchProductos();
-  }, [backendUrl]);
-
-  // Obtener categorías para el formulario de edición
-  useEffect(() => {
-    axios.get(`${backendUrl}/api/productos/listar-categorias`)
-      .then(response => setCategorias(response.data))
-      .catch(error => console.error('Error al obtener categorías:', error));
-  }, [backendUrl]);
 
   // Abrir modal de edición con los datos del producto seleccionado
   const handleEditClick = (producto) => {
@@ -83,10 +114,9 @@ const ProductList = () => {
   };
 
   return (
-    <div className='productos'>
+    <div className='productos-table contenido'>
       <h2>Lista de Productos</h2>
       {errorMessage && <div className="error">{errorMessage}</div>}
-
       <table>
         <thead>
           <tr>
@@ -96,6 +126,7 @@ const ProductList = () => {
             <th>Precio</th>
             <th>Categoría</th>
             <th>Acciones</th>
+            <th>Selecciona</th>
           </tr>
         </thead>
         <tbody>
@@ -105,26 +136,37 @@ const ProductList = () => {
               <td>{producto.nombre}</td>
               <td>{producto.marca}</td>
               <td>${producto.precio}</td>
-              <td>{categorias.find(c => c.id === producto.categoriaId)?.nombre || 'Sin categoría'}</td>
+              <td>{producto.categoria.nombre}</td>
               <td>
                 <button onClick={() => handleEditClick(producto)}>Modificar</button>
+              </td>
+              <td>
+                <input
+                  type="checkbox"
+                  checked={selectedProducts.includes(producto.id)}
+                  onChange={() => handleCheckboxChange(producto.id)}
+                />
               </td>
             </tr>
           ))}
         </tbody>
       </table>
 
+      <button onClick={handleBuyClick} disabled={selectedProducts.length === 0}>
+        Comprar
+      </button>
+
       {/* Modal para edición del producto */}
       {modalVisible && productoSeleccionado && (
         <div className="modal">
           <h3>Editar Producto</h3>
           <form onSubmit={handleSubmit}>
-            <div>
+            <div className='dato'>
               <label>ID:</label>
               <span>{productoSeleccionado.id}</span>
             </div>
 
-            <div>
+            <div className='dato'>
               <label>Codigo: </label>
               <input
                 type="text"
@@ -135,7 +177,7 @@ const ProductList = () => {
               />
             </div>
 
-            <div>
+            <div className='dato'>
               <label>Nombre: </label>
               <input
                 type="text"
@@ -145,7 +187,7 @@ const ProductList = () => {
               />
             </div>
             
-            <div>
+            <div className='dato'>
               <label>Marca: </label>
               <input
                 type="text"
@@ -155,7 +197,7 @@ const ProductList = () => {
               />
             </div>
             
-            <div>
+            <div className='dato'>
               <label>Precio: </label>
               <input
                 type="number"
@@ -165,11 +207,11 @@ const ProductList = () => {
               />
             </div>
 
-            <div>
+            <div className='dato'>
               <label>Categoría: </label>
               <select
                 name="categoriaId"
-                value={productoSeleccionado.categoriaId || ''}
+                value={productoSeleccionado.categoria ? productoSeleccionado.categoria.id : ''}
                 onChange={handleInputChange}
               >
                 <option value="" disabled>Selecciona una categoría</option>
@@ -179,7 +221,7 @@ const ProductList = () => {
               </select>
             </div>
 
-            <div>
+            <div className='dato'>
               <label>Versión: </label>
               <input
                 type="number"
@@ -195,10 +237,31 @@ const ProductList = () => {
           </form>
         </div>
       )}
+      {modalCompraVisible && (
+        <div className="modal">
+          <h3>Confirmar Compra</h3>
+          <p>Productos seleccionados:</p>
+          <ul>
+            {selectedProducts.map((id) => {
+              const producto = productos.find((p) => p.id === id);
+              return <li key={id}>{producto.nombre}</li>; // Muestra el nombre del producto
+            })}
+          </ul>
+          <div>
+            <label>Tarjeta:</label>
+            <select value={tarjetaId} onChange={(e) => setTarjetaId(e.target.value)}>
+              <option value="">Selecciona una tarjeta</option>
+              {tarjetas.map(tarjeta => (
+                <option key={tarjeta.id} value={tarjeta.id}>{tarjeta.nombre}</option>
+              ))}
+            </select>
+          </div>
+          <button onClick={handleBuyClick}>Confirmar Compra</button>
+          <button onClick={() => setModalCompraVisible(false)}>Cancelar</button>
+        </div>
+      )}
     </div>
   );
 };
 
 export default ProductList;
-
-

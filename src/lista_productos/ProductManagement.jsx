@@ -1,9 +1,8 @@
-// eslint-disable-next-line no-unused-vars
-import React, { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react'
 import axios from 'axios';
 import './ProductManagement.css';
 
-const backendUrl = 'http://localhost:8080/api';
+const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
 function ProductManagement() {
   // eslint-disable-next-line no-unused-vars
