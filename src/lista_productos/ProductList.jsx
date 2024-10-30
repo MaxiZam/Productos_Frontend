@@ -32,7 +32,7 @@ const ProductList = () => {
     axios.get(`${backendUrl}/api/productos/listar-categorias`)
       .then(response => setCategorias(response.data))
       .catch(error => console.error('Error al obtener categorías:', error));
-  }, [backendUrl]);
+  }, [backendUrl, clienteId]);
 
   const handleCheckboxChange = (productoId) => {
     setSelectedProducts((prevSelected) => {
